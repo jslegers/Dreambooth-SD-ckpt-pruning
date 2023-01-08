@@ -1,13 +1,8 @@
+
 import os
 import torch
-import argparse
-import glob
+import fire
 
-
-parser = argparse.ArgumentParser(description='Pruning')
-parser.add_argument('--ckpt', type=str, default=None, help='path to model ckpt')
-args = parser.parse_args()
-ckpt = args.ckpt
 
 def prune_it(p, keep_only_ema=False):
     print(f"prunin' in path: {p}")
@@ -25,23 +20,17 @@ def prune_it(p, keep_only_ema=False):
     if keep_only_ema:
         sd = nsd["state_dict"].copy()
         # infer ema keys
-        ema_keys = {k: "model_ema." + k[6:].replace(".", ".") for k in sd.keys() if k.startswith("model.")}
+        ema_keys = {k: "model_ema." + k[6:].replace(".", "") for k in sd.keys() if k.startswith("model.")}
         new_sd = dict()
 
         for k in sd:
             if k in ema_keys:
-                new_sd[k] = sd[ema_keys[k]].half()
+                new_sd[k] = sd[ema_keys[k]]
             elif not k.startswith("model_ema.") or k in ["model_ema.num_updates", "model_ema.decay"]:
-                new_sd[k] = sd[k].half()
+                new_sd[k] = sd[k]
 
         assert len(new_sd) == len(sd) - len(ema_keys)
         nsd["state_dict"] = new_sd
-    else:
-        sd = nsd['state_dict'].copy()
-        new_sd = dict()
-        for k in sd:
-            new_sd[k] = sd[k].half()
-        nsd['state_dict'] = new_sd
 
     fn = f"{os.path.splitext(p)[0]}-pruned.ckpt" if not keep_only_ema else f"{os.path.splitext(p)[0]}-ema-pruned.ckpt"
     print(f"saving pruned checkpoint at: {fn}")
@@ -55,4 +44,5 @@ def prune_it(p, keep_only_ema=False):
 
 
 if __name__ == "__main__":
-    prune_it(ckpt)
+    fire.Fire(prune_it)
+    print("done.")
